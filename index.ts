@@ -97,8 +97,7 @@ function getEmojiForModule(moduleName: string): string {
     "streaming-data": "🌊",
     "streaming-data-ui": "💫",
     tools: "🛠️",
-    images: "🖼️",
-    "pdf-generation": "📄",
+    "generate-image": "🖼️",
     "agent-ai": "🤖",
   }
 
