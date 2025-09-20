@@ -1,6 +1,10 @@
-import { streamText, UIMessage, convertToModelMessages } from "ai"
+import { streamText, UIMessage, convertToModelMessages, stepCountIs } from "ai"
+import { ALL_TOOLS } from "@/tools"
+import { SYSTEM_PROMPT } from "@/consts"
 import { openai } from "@ai-sdk/openai"
-
+import { google } from "@ai-sdk/google"
+import { anthropic } from "@ai-sdk/anthropic"
+import { deepseek } from "@ai-sdk/deepseek"
 
 export const maxDuration = 3
 
@@ -8,28 +12,35 @@ export async function POST(req: Request) {
   const {
     messages,
     model,
-    webSearch,
-    dialect = "postgres",
+    provider,
   }: {
     messages: UIMessage[]
     model: string
-    webSearch: boolean
-    dialect: "postgres" | "mysql" | "sqlite"
+    provider: string
   } = await req.json()
 
-  const system = [
-    "Eres un arquitecto de datos.",
-    "Objetivo: devolver SOLO un objeto JSON válido que cumpla el esquema DiagramModel.",
-    "Reglas: snake_case; normaliza lo razonable; define claves primarias y FKs explícitas; ",
-    "usa tipos del dialecto indicado; incluye created_at/updated_at si aplica.",
-  ].join(" ")
+  function getModel(provider: string, model: string) {
+    switch (provider) {
+      case "openai":
+        return openai(model)
+      case "deepseek":
+        return deepseek(model)
+      case "anthropic":
+        return anthropic(model)
+      case "google":
+        return openai(model)
+      default:
+        return openai("gpt-4.1")
+    }
+  }
 
   const result = streamText({
-    model: openai("gpt-4.1"),
+    model: getModel(model, provider),
     messages: convertToModelMessages(messages),
-    system: system,
-    tools: {},
+    system: SYSTEM_PROMPT,
+    tools: ALL_TOOLS,
     toolChoice: "auto",
+    stopWhen: stepCountIs(10),
   })
 
   return result.toUIMessageStreamResponse({

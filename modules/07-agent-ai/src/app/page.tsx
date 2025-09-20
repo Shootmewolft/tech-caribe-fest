@@ -1,13 +1,6 @@
 "use client"
 
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { Fragment, useCallback, useEffect, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import {
   Conversation,
@@ -38,13 +31,7 @@ import {
 } from "@/components/ai-elements/prompt-input"
 import { Actions, Action } from "@/components/ai-elements/actions"
 import { Response } from "@/components/ai-elements/response"
-import {
-  CopyIcon,
-  GlobeIcon,
-  RefreshCcwIcon,
-  Sparkles,
-  TriangleAlert,
-} from "lucide-react"
+import { CopyIcon, RefreshCcwIcon, Sparkles, TriangleAlert } from "lucide-react"
 import {
   Source,
   Sources,
@@ -59,13 +46,14 @@ import {
 import { Loader } from "@/components/ai-elements/loader"
 
 const models = [
-  { name: "GPT 4o", value: "openai/gpt-4o" },
-  { name: "Deepseek R1", value: "deepseek/deepseek-r1" },
+  { name: "GPT 4o", value: "openai/gpt-4o", provider: "openai" },
+  { name: "Deepseek R1", value: "deepseek/deepseek-r1", provider: "deepseek" },
+  { name: "Claude 3", value: "anthropic/claude-3", provider: "anthropic" },
+  { name: "Google Gemini 2.5", value: "google/gemini-2.5", provider: "google" },
 ]
 
 const STORAGE_KEYS = {
   model: "chat:model",
-  webSearch: "chat:webSearch",
 }
 
 const EmptyState = () => (
@@ -78,8 +66,8 @@ const EmptyState = () => (
     </div>
     <h2 className="text-xl font-semibold">Chatea con tu agente de IA</h2>
     <p className="text-sm text-muted-foreground max-w-prose">
-      Haz una pregunta, pega texto o adjunta archivos. Usa el botón{" "}
-      <span className="font-medium">Search</span> para habilitar navegación web.
+      Haz una pregunta, pega texto. Recuerda que puedes cambiar entre {" "}
+      <span className="font-medium">modelos</span> para más presición.
     </p>
   </div>
 )
@@ -91,11 +79,6 @@ const ChatBotDemo = () => {
       ? localStorage.getItem(STORAGE_KEYS.model) || models[0].value
       : models[0].value
   )
-  const [webSearch, setWebSearch] = useState<boolean>(() =>
-    typeof window !== "undefined"
-      ? localStorage.getItem(STORAGE_KEYS.webSearch) === "true"
-      : false
-  )
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -104,9 +87,6 @@ const ChatBotDemo = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.model, model)
   }, [model])
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.webSearch, String(webSearch))
-  }, [webSearch])
 
   const isStreaming = status === "streaming"
   const isSubmitting = status === "submitted" || status === "streaming"
@@ -138,11 +118,11 @@ const ChatBotDemo = () => {
           text: message.text || "Sent with attachments",
           files: message.files,
         },
-        { body: { model, webSearch } }
+        { body: { model } }
       )
       setInput("")
     },
-    [model, webSearch, sendMessage]
+    [model, sendMessage]
   )
 
   const lastMessageId = messages.at(-1)?.id
@@ -177,17 +157,6 @@ const ChatBotDemo = () => {
                 ))}
               </PromptInputModelSelectContent>
             </PromptInputModelSelect>
-
-            <PromptInputButton
-              type="button"
-              variant={webSearch ? "default" : "ghost"}
-              onClick={() => setWebSearch((v) => !v)}
-              aria-pressed={webSearch}
-              title={webSearch ? "Web Search activado" : "Activar Web Search"}
-            >
-              <GlobeIcon className="size-4" />
-              <span className="hidden sm:inline">Search</span>
-            </PromptInputButton>
           </div>
         </div>
       </header>
@@ -327,18 +296,6 @@ const ChatBotDemo = () => {
                   </PromptInputActionMenuContent>
                 </PromptInputActionMenu>
 
-                <PromptInputButton
-                  type="button"
-                  variant={webSearch ? "default" : "ghost"}
-                  onClick={() => setWebSearch((v) => !v)}
-                  title={
-                    webSearch ? "Web Search activado" : "Activar Web Search"
-                  }
-                >
-                  <GlobeIcon className="size-4" />
-                  <span>Search</span>
-                </PromptInputButton>
-
                 <PromptInputModelSelect
                   onValueChange={(value) => setModel(value)}
                   value={model}
@@ -356,7 +313,6 @@ const ChatBotDemo = () => {
                 </PromptInputModelSelect>
               </PromptInputTools>
 
-              {/* Nota: solo deshabilitamos cuando realmente está enviando */}
               <PromptInputSubmit disabled={isSubmitting} status={status} />
             </PromptInputToolbar>
           </PromptInput>
