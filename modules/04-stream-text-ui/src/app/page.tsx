@@ -18,7 +18,7 @@ export default function Chat() {
       <header className="w-full max-w-2xl mx-auto px-4 pt-10 pb-4 flex items-center gap-3">
         <img src="/globe.svg" alt="Logo" className="w-8 h-8" />
         <h1 className="text-2xl font-bold tracking-tight text-zinc-800 dark:text-zinc-100">
-          Caribe Fest AI Chat
+          Tech Caribe Fest AI Chat
         </h1>
       </header>
 
