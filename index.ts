@@ -11,6 +11,8 @@ interface Module {
   description: string
   path: string
   emoji: string
+  isNextJs?: boolean
+  dir?: string
 }
 
 function scanModules(): Module[] {
@@ -26,26 +28,59 @@ function scanModules(): Module[] {
 
       if (stat.isDirectory()) {
         const indexPath = path.join(fullPath, "index.ts")
+        let isNextJs = false
+        let nextDir = undefined
 
         try {
-          statSync(indexPath)
+          statSync(path.join(fullPath, "next.config.ts"))
+          isNextJs = true
+          nextDir = fullPath
+        } catch {}
+        if (!isNextJs) {
+          try {
+            const pkgPath = path.join(fullPath, "package.json")
+            const pkg = JSON.parse(require("fs").readFileSync(pkgPath, "utf-8"))
+            if (pkg.dependencies && pkg.dependencies.next) {
+              isNextJs = true
+              nextDir = fullPath
+            }
+          } catch {}
+        }
 
+        if (isNextJs) {
           const parts = entry.split("-")
           const number = parts[0]
           const nameParts = parts.slice(1)
           const name = nameParts
             .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
             .join(" ")
-
           const emoji = getEmojiForModule(entry)
-
           modules.push({
             name: `${number}. ${name}`,
             description: getDescriptionForModule(entry),
-            path: indexPath,
+            path: "dev", // comando
             emoji,
+            isNextJs: true,
+            dir: nextDir,
           })
-        } catch {}
+        } else {
+          try {
+            statSync(indexPath)
+            const parts = entry.split("-")
+            const number = parts[0]
+            const nameParts = parts.slice(1)
+            const name = nameParts
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join(" ")
+            const emoji = getEmojiForModule(entry)
+            modules.push({
+              name: `${number}. ${name}`,
+              description: getDescriptionForModule(entry),
+              path: indexPath,
+              emoji,
+            })
+          } catch {}
+        }
       }
     }
   } catch (error) {
@@ -76,7 +111,6 @@ function getEmojiForModule(moduleName: string): string {
   return "⚡"
 }
 
-// Función para obtener descripción basada en el nombre del módulo
 function getDescriptionForModule(moduleName: string): string {
   const descriptionMap: { [key: string]: string } = {
     "generate-text": "Generación de texto con IA",
@@ -113,7 +147,9 @@ function showBanner(): void {
 
   console.log(chalk.gray("=".repeat(60)))
   console.log(
-    chalk.white.bold("🚀 Creando agentes inteligentes con Next.js | Alvaro Pedrozo")
+    chalk.white.bold(
+      "🚀 Creando agentes inteligentes con Next.js | Alvaro Pedrozo"
+    )
   )
   console.log(chalk.gray("=".repeat(60)))
   console.log()
@@ -121,21 +157,34 @@ function showBanner(): void {
 
 async function executeModule(
   modulePath: string,
-  moduleName: string
+  moduleName: string,
+  isNextJs?: boolean,
+  dir?: string
 ): Promise<void> {
   console.log(chalk.cyan(`\n🚀 Ejecutando: ${moduleName}`))
   console.log(chalk.gray("-".repeat(50)))
 
   try {
-    const command = `cd "${path.dirname(__dirname)}" && bun run "${modulePath}"`
+    let command = ""
+    if (isNextJs && dir) {
+      command = `cd \"${dir}\" && bun run dev`
+    } else {
+      command = `cd \"${path.dirname(__dirname)}\" && bun run \"${modulePath}\"`
+    }
 
     console.log()
-
-    execSync(command, {
-      stdio: "inherit",
-      encoding: "utf-8",
-    })
-
+    execSync(
+      command,
+      Object.assign(
+        {
+          stdio: "inherit" as const,
+          encoding: "utf8" as BufferEncoding,
+        },
+        process.platform === "win32"
+          ? { shell: "pwsh.exe" }
+          : { shell: "/bin/bash" }
+      )
+    )
     console.log()
   } catch (error) {
     console.log()
@@ -182,26 +231,32 @@ async function launcher(): Promise<void> {
 
     choices.push({
       name: `${chalk.red("🚪 Salir")}`,
-      value: "exit",
+      value: "exit" as any,
       short: "Salir",
     })
 
-    const { selectedModule }: { selectedModule: Module | "exit" } = await inquirer.prompt([
-      {
-        type: "list",
-        name: "selectedModule",
-        message: chalk.white.bold("¿Qué módulo deseas ejecutar?"),
-        choices,
-        pageSize: 10,
-      },
-    ])
+    const { selectedModule }: { selectedModule: Module | "exit" } =
+      await inquirer.prompt([
+        {
+          type: "list",
+          name: "selectedModule",
+          message: chalk.white.bold("¿Qué módulo deseas ejecutar?"),
+          choices,
+          pageSize: 10,
+        },
+      ])
 
     if (selectedModule === "exit") {
       console.log(chalk.cyan("\n👋 ¡Hasta luego!"))
       break
     }
 
-    await executeModule(selectedModule.path, selectedModule.name)
+    await executeModule(
+      selectedModule.path,
+      selectedModule.name,
+      selectedModule.isNextJs,
+      selectedModule.dir
+    )
   }
 }
 
