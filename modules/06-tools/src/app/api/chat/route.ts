@@ -18,6 +18,50 @@ import { resolveSafe, statEntry, walk } from "@/utils/utils"
 const BASE_DIR = process.cwd()
 
 const tools = {
+  getWeather: tool({
+    description:
+      "Obtiene el clima actual para una ubicación dada. Devuelve métricas clave para entender el clima.",
+    inputSchema: z.object({
+      location: z
+        .string()
+        .min(1, "Debes indicar una ubicación.")
+        .describe("Ubicación para obtener el clima"),
+    }),
+    execute: async ({ location }: { location: string }) => {
+      try {
+        if (!process.env.WEATHER_API_KEY) {
+          return {
+            ok: false,
+            error: "Falta WEATHER_API_KEY en variables de entorno.",
+          }
+        }
+
+        const q = encodeURIComponent(location.trim())
+        const url = `https://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${q}`
+
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+          },
+          cache: "no-store" as RequestCache,
+        })
+
+        const data = await res.json()
+
+        if (!res.ok || (data && data.error)) {
+          const message =
+            data?.error?.message ??
+            `HTTP ${res.status} ${res.statusText || ""}`.trim()
+          return { ok: false, status: res.status, error: message }
+        }
+
+        return { ok: true, weather: data }
+      } catch (err: any) {
+        return { ok: false, error: err?.message ?? String(err) }
+      }
+    },
+  }),
+
   writeFile: tool({
     description:
       "Escribe un archivo. Crea directorios intermedios si no existen.",
@@ -270,6 +314,7 @@ export async function POST(req: Request) {
       "\n- Buscar archivos por nombre, extensión y patrón" +
       "\nSiempre que sea posible, usa las herramientas para manipular el sistema de archivos en lugar de inventar respuestas." +
       "\n Todos los archivos que crees que sean markdown para que guardes la información ahí" +
+      "\n Siempre que uses las herramientas, explica qué herramienta usaste y por qué." +
       "\nResponde de manera concisa y clara.",
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(10), // IMPORTANTE!!!
